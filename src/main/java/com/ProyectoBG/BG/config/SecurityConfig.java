@@ -12,6 +12,7 @@ import org.springframework.security.config.Customizer;
 @Configuration
 public class SecurityConfig {
 
+    //Primera configuración: Security Filter
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
