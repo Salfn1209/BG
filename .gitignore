@@ -37,3 +37,6 @@ build/
 
 ###Agregar la carpeta con la bd para no enviar la bd al repositorio
 mysql-data/
+
+# .gitignore
+/secrets/
