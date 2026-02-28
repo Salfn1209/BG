@@ -38,5 +38,5 @@ build/
 ###Agregar la carpeta con la bd para no enviar la bd al repositorio
 mysql-data/
 
-# .gitignore
-/secrets/
+# Ignirara la carpeta con contenido sensible para implementar dockersecrets
+secrets/

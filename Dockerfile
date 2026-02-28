@@ -1,25 +1,35 @@
-# --- FASE 1: Compilación (Build) ---
 FROM amazoncorretto:17-alpine-jdk AS build
 WORKDIR /app
 
-# Copiamos solo lo necesario para descargar dependencias (optimiza caché)
-COPY .mvn/ .mvn
-COPY mvnw pom.xml ./
-RUN ./mvnw dependency:go-offline
+# Copia mínima para descargar dependencias
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
-# Copiamos el código y generamos el JAR saltando tests 
-# (porque ya los corrimos en el pipeline de CI/CD)
+# Construcción
 COPY src ./src
-RUN ./mvnw package -DskipTests
+RUN ./mvnw package -DskipTests -B && \
+    cp target/*.jar app.jar
 
-# --- FASE 2: Imagen de Producción (Run) ---
+# Usamos una imagen más ligera
 FROM amazoncorretto:17-alpine
 WORKDIR /app
 
-# Copiamos SOLO el archivo ejecutable desde la fase anterior
-COPY --from=build /app/target/*.jar app.jar
+# Seguridad
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring
 
-# Buenas prácticas de seguridad: No correr como root (opcional pero recomendado)
-# EXPOSE y ENTRYPOINT
+COPY --from=build /app/app.jar app.jar
+
+# Configuración de red y ejecución
 EXPOSE 8086
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+# Variables de entorno opcionales para facilitar cambios sin rebuild
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+# Requiere tener 'curl' instalado en alpine o usar un comando de java
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD wget -q --spider http://localhost:8086/actuator/health || exit 1
+  
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
