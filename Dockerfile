@@ -1,24 +1,25 @@
-# 1. Usar la imagen de Amazon Corretto
-FROM amazoncorretto:17-alpine-jdk
-
-# 2. Directorio de trabajo
+# --- FASE 1: Compilación (Build) ---
+FROM amazoncorretto:17-alpine-jdk AS build
 WORKDIR /app
 
-# 3. ??IMPORTANTE! Copiar los archivos de Maven y el c??digo fuente primero
-# Copiamos el wrapper y el pom.xml
+# Copiamos solo lo necesario para descargar dependencias (optimiza caché)
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
+RUN ./mvnw dependency:go-offline
 
-# Copiamos el c??digo fuente
+# Copiamos el código y generamos el JAR saltando tests 
+# (porque ya los corrimos en el pipeline de CI/CD)
 COPY src ./src
-
-# 4. Ahora s??, compilar saltando los tests
 RUN ./mvnw package -DskipTests
 
-# 5. Copiar el JAR generado (ajusta el nombre si es necesario)
-# Al compilar dentro, el jar est?? en target/
-RUN cp target/*.jar app.jar
+# --- FASE 2: Imagen de Producción (Run) ---
+FROM amazoncorretto:17-alpine
+WORKDIR /app
 
-# 6. Configuraci??n final
+# Copiamos SOLO el archivo ejecutable desde la fase anterior
+COPY --from=build /app/target/*.jar app.jar
+
+# Buenas prácticas de seguridad: No correr como root (opcional pero recomendado)
+# EXPOSE y ENTRYPOINT
 EXPOSE 8086
 ENTRYPOINT ["java", "-jar", "app.jar"]
